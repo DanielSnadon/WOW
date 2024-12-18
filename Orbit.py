@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import krpc
 import time
 
@@ -9,7 +8,6 @@ conn = krpc.connect(name="My project")
 vessel = conn.space_center.active_vessel
 ap = vessel.auto_pilot
 control = vessel.control
-initial_propellant_mass = vessel.mass
 
 # Создание полезных переменных потока
 altitude = conn.add_stream(getattr, vessel.flight(), "mean_altitude")
@@ -28,26 +26,13 @@ liquid_fuel_resource = fuel_tank.resources.with_resource("LiquidFuel")[0]
 # Получение текущего количества топлива
 current_fuel = liquid_fuel_resource.amount
 
-# Данные для создания графиков
-speed_data = []
-high_data = []
-mass_data = []
-time_data = []
-
 
 # Функция вывода информации в терминал
 def print_logs(mass, curr_speed):
-    print(f"*Данные на {seconds} минуте*")
+    print(f"*Данные на {seconds} секунде*")
     print(f"Текущая скорость ступенчатой ракеты: {curr_speed} м/с")
     print("Расстояние от Земли:", round(altitude(), 3), "м")
     print(f"Масса ракеты: {mass} кг\n")
-
-
-def get_logs(ideal, distance, mass, curr_time):
-    speed_data.append(ideal)
-    high_data.append(distance)
-    mass_data.append(mass)
-    time_data.append(curr_time)
 
 
 # Активация двигателя
@@ -62,17 +47,17 @@ print("2...")
 time.sleep(1)
 print("1...")
 control.activate_next_stage()
-
 timing = time.time()
 
-print("\n*Данные на 0 минуте*")
+# Данные на первую секунду полета
+print("\n*Данные на 0 секунде*")
 print(f"Текущая скорость ступенчатой ракеты: {0} м/с")
 print("Расстояние от Земли:", round(altitude(), 3), "м")
-print(f"Масса ракеты на момент старта составляет: {vessel.mass}\n")
+print(f"Масса ракеты на момент старта составляет: {vessel.mass} кг\n")
+
+# Вспомогательные переменные необходимые для корректной работы программы
 times = 0
 changed = 0
-
-get_logs(0, round(altitude(), 3), vessel.mass, 0)
 
 while True:
     seconds = round(time.time() - timing)
@@ -82,8 +67,6 @@ while True:
         surface_velocity[0] ** 2 + surface_velocity[1] ** 2 + surface_velocity[2] ** 2
     )
     surface_speed = surface_speed**0.5
-
-    get_logs(surface_speed, round(altitude(), 3), vessel.mass, seconds)
     if 13 <= seconds <= 17:
         if times == 0:
             times += 1
@@ -102,6 +85,8 @@ while True:
         vessel.control.pitch = -1
         time.sleep(4.0)
         vessel.control.pitch = 0
+        angle = vessel.flight().pitch
+        print(f"Текущий угол наклона относительно горизонтальной оси: {angle}")
         changed += 1
 
     elif (times == 2) and (58 <= seconds <= 62):
@@ -129,15 +114,19 @@ control.sas = True
 vessel.control.pitch = -1
 time.sleep(5.0)
 vessel.control.pitch = 0
-
+angle = vessel.flight().pitch
+print(f"Текущий угол наклона относительно горизонтальной оси: {angle}")
 print("\nРакета идет к орбите")
 
+
+# Летим до определенных значений апогея и перегея
 last = 0
 while True:
     apoapsis_value = apoapsis()
     periapsis_value = periapsis()
     time.sleep(0.1)
     if (850000 <= apoapsis_value) and (90000 <= periapsis_value):
+        # выключение двигателей
         print("*отключение двигателей*")
         control.sas = False
         vessel.control.pitch = 0.05
@@ -147,7 +136,7 @@ while True:
         control.throttle = 0
         break
 
-print("*ракета выщла на орбиту*")
+print("*ракета вышла на орбиту*")
 # Выпуск спутника на орбиту
 time.sleep(5)
 control.activate_next_stage()
@@ -157,46 +146,4 @@ control.activate_next_stage()
 print("*вывод антенн*")
 time.sleep(5)
 control.antennas = True
-
 print("Спутник успешно вышел на орбиту!")
-
-# Построение графиков
-x = np.linspace(
-    0, time_data[-1] * 60, len(time_data)
-)  # Общее значение X для всех графиков
-y1 = mass_data  # Первый график: масса
-y2 = speed_data  # Второй график: скорость
-y3 = high_data  # Третий график: высота
-
-# Создание фигуры и осей
-fig, axs = plt.subplots(3, 1, figsize=(5, 12))
-
-# Первый график
-axs[0].plot(x, y1, color="blue", label="Масса", linewidth=2)
-axs[0].set_title("График массы (кг)")
-axs[0].set_xlabel("Время (сек)")
-axs[0].set_ylabel("Масса (кг)")
-axs[0].grid()
-axs[0].legend()
-
-# Второй график
-axs[1].plot(x, y2, color="red", label="Скорость", linewidth=2)
-axs[1].set_title("График скорости (м/c)")
-axs[1].set_xlabel("Время (сек)")
-axs[1].set_ylabel("Скорость (м/c)")
-axs[1].grid()
-axs[1].legend()
-
-# Третий график
-axs[2].plot(x, y3, color="green", label="Высота", linewidth=2)
-axs[2].set_title("График высоты (м)")
-axs[2].set_xlabel("Время (сек)")
-axs[2].set_ylabel("Высота (м)")
-axs[2].grid()
-axs[2].legend()
-
-# Настройка общего расстояния между графиками
-plt.tight_layout()
-
-# Показ графиков
-plt.show()
